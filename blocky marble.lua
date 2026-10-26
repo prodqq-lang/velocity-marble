@@ -109,7 +109,7 @@ new("UIStroke", { Color = Color3.fromRGB(45, 45, 45), Thickness = 1 }, main)
 local titleBar = new("Frame", {
 	BackgroundColor3 = C.bg, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 30),
 }, main)
-label(titleBar, "Utility", 13, C.accent, UDim2.fromOffset(12, 0), UDim2.new(1, -24, 1, 0))
+label(titleBar, "QQ Hud (I just lost my marbles)", 13, C.accent, UDim2.fromOffset(12, 0), UDim2.new(1, -24, 1, 0))
 new("Frame", { BackgroundColor3 = C.line, BorderSizePixel = 0, Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1) }, titleBar)
 
 -- dragging
