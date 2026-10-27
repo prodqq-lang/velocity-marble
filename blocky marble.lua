@@ -109,7 +109,7 @@ new("UIStroke", { Color = Color3.fromRGB(45, 45, 45), Thickness = 1 }, main)
 local titleBar = new("Frame", {
 	BackgroundColor3 = C.bg, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 30),
 }, main)
-label(titleBar, "QQ Hud (I just lost my marbles)", 13, C.accent, UDim2.fromOffset(12, 0), UDim2.new(1, -24, 1, 0))
+label(titleBar, "qq hud marble edition", 13, C.accent, UDim2.fromOffset(12, 0), UDim2.new(1, -24, 1, 0))
 new("Frame", { BackgroundColor3 = C.line, BorderSizePixel = 0, Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1) }, titleBar)
 
 -- dragging
@@ -148,7 +148,7 @@ new("Frame", { BackgroundColor3 = C.line, BorderSizePixel = 0, Position = UDim2.
 local footer = new("Frame", {
 	BackgroundColor3 = C.bg, BorderSizePixel = 0, Position = UDim2.new(0, 0, 1, -20), Size = UDim2.new(1, 0, 0, 20),
 }, main)
-label(footer, "Version 1.1 (fixes to hud and trails)", 11, C.dim, UDim2.fromOffset(10, 0), UDim2.new(0.7, -10, 1, 0))
+label(footer, "Version 1.2 (Checkpoints for the lazy guys)", 11, C.dim, UDim2.fromOffset(10, 0), UDim2.new(0.7, -10, 1, 0))
 label(footer, "RightShift = toggle", 11, C.dim, UDim2.new(0.7, 0, 0, 0), UDim2.new(0.3, -10, 1, 0), Enum.TextXAlignment.Right)
 
 -- content area
@@ -507,7 +507,182 @@ Toggle(visScroll, "Enabled", false, function(v)
 		info.gui.Enabled = v
 	end
 end)
-Note(visScroll, "The forbidden NIGGA ESP HAHAHAHAHA", 44)
+Note(visScroll, "Hidden stuff nigga", 44)
+
+----------------------------------------------------------------
+-- Checkpoint ESP: highlights everything under "_checkpoints"
+-- (works whether _checkpoints is a Folder or a Model)
+----------------------------------------------------------------
+env.CheckpointESP = false
+env.CheckpointHighlight = true
+env.CheckpointLabels = true
+
+local CP_NAME = "_checkpoints"
+local cpContainer = new("Folder", { Name = "CheckpointESP" }, gui)
+local cpTracked = {}    -- [target] = { hl, gui, grad, dist, off }
+local cpContainers = {} -- [_checkpoints instance] = true
+local cpCount = 0
+
+-- true if inst sits directly under _checkpoints (or under Folders inside it)
+local function cpInside(inst)
+	local p = inst.Parent
+	while p and p ~= workspace do
+		if p.Name == CP_NAME then return true end
+		if not p:IsA("Folder") then return false end
+		p = p.Parent
+	end
+	return false
+end
+
+local function cpAdornee(target)
+	if target:IsA("BasePart") then return target end
+	if target:IsA("Model") then
+		return target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart", true)
+	end
+end
+
+local function cpRefresh(info)
+	info.hl.Enabled = env.CheckpointESP and env.CheckpointHighlight
+	info.gui.Enabled = env.CheckpointESP and env.CheckpointLabels
+end
+
+local function cpUntrack(target)
+	local info = cpTracked[target]
+	if info then
+		info.hl:Destroy()
+		info.gui:Destroy()
+		cpTracked[target] = nil
+	end
+end
+
+local function cpTrack(target)
+	if cpTracked[target] then return end
+	if not (target:IsA("Model") or target:IsA("BasePart")) then return end
+	local part = cpAdornee(target)
+	if not part then return end
+
+	local hl = new("Highlight", {
+		Name = "CheckpointHL", Adornee = target, FillTransparency = 0.55, OutlineTransparency = 0,
+		DepthMode = Enum.HighlightDepthMode.AlwaysOnTop, FillColor = Color3.new(1, 1, 1),
+		OutlineColor = Color3.new(1, 1, 1), Enabled = false,
+	}, cpContainer, true)
+
+	local bb = new("BillboardGui", {
+		Name = "CheckpointTag", Adornee = part, AlwaysOnTop = true, Size = UDim2.new(0, 110, 0, 40),
+		StudsOffset = Vector3.new(0, 2, 0), LightInfluence = 0, ResetOnSpawn = false, Enabled = false,
+	}, cpContainer, true)
+	new("UIListLayout", { HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }, bb, true)
+
+	local function line(order, color)
+		return new("TextLabel", {
+			BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 13), Font = FONT, TextSize = 11,
+			TextColor3 = color, TextStrokeTransparency = 0.4, LayoutOrder = order,
+		}, bb, true)
+	end
+
+	local title = line(1, Color3.new(1, 1, 1))
+	title.Text = "Checkpoint"
+	local grad = new("UIGradient", {}, title, true) -- rainbow, animated below
+	local nameLabel = line(2, Color3.new(1, 1, 1))
+	nameLabel.Text = target.Name
+	local distLabel = line(3, Color3.fromRGB(180, 180, 180))
+
+	cpCount += 1
+	local info = { hl = hl, gui = bb, grad = grad, dist = distLabel, off = (cpCount * 0.08) % 1 }
+	cpTracked[target] = info
+	distLabel.Text = string.format("[%d studs]", (part.Position - getRoot()).Magnitude)
+	cpRefresh(info)
+end
+
+local function cpScanContainer(c)
+	cpContainers[c] = true
+	for _, x in ipairs(c:GetDescendants()) do
+		if (x:IsA("Model") or x:IsA("BasePart")) and cpInside(x) then
+			cpTrack(x)
+		end
+	end
+end
+
+task.spawn(function()
+	for _, inst in ipairs(workspace:GetDescendants()) do
+		if inst.Name == CP_NAME then cpScanContainer(inst) end
+	end
+end)
+
+connect(workspace.DescendantAdded, function(inst)
+	if inst.Name == CP_NAME then
+		task.defer(cpScanContainer, inst)
+	elseif (inst:IsA("Model") or inst:IsA("BasePart")) and cpInside(inst) then
+		task.defer(cpTrack, inst)
+	end
+end)
+
+do
+	local acc, scanAcc = 0, 0
+	connect(RunService.Heartbeat, function(dt)
+		if not env.CheckpointESP then return end
+		acc += dt
+		scanAcc += dt
+
+		-- every couple of seconds, pick up anything that streamed in late
+		if scanAcc > 2 then
+			scanAcc = 0
+			for c in pairs(cpContainers) do
+				if c:IsDescendantOf(workspace) then
+					cpScanContainer(c)
+				else
+					cpContainers[c] = nil
+				end
+			end
+		end
+
+		if acc < 0.1 then return end
+		acc = 0
+		local origin = getRoot()
+		for target, info in pairs(cpTracked) do
+			local part = cpAdornee(target)
+			if not part or not target:IsDescendantOf(workspace) or not cpInside(target) then
+				cpUntrack(target)
+			else
+				info.gui.Adornee = part
+				info.dist.Text = string.format("[%d studs]", (part.Position - origin).Magnitude)
+			end
+		end
+	end)
+
+	-- rainbow billboard title + rainbow highlight
+	connect(RunService.RenderStepped, function()
+		if not env.CheckpointESP or next(cpTracked) == nil then return end
+		local shift = (os.clock() * 0.35) % 1
+		local pts = {}
+		for i = 0, 6 do
+			local t = i / 6
+			pts[#pts + 1] = ColorSequenceKeypoint.new(t, Color3.fromHSV((shift + t) % 1, 0.85, 1))
+		end
+		local seq = ColorSequence.new(pts)
+		for _, info in pairs(cpTracked) do
+			info.grad.Color = seq
+			local col = Color3.fromHSV((shift + info.off) % 1, 0.85, 1)
+			info.hl.FillColor = col
+			info.hl.OutlineColor = col
+		end
+	end)
+end
+
+Section(visScroll, "Checkpoint ESP")
+Toggle(visScroll, "Enabled", false, function(v)
+	env.CheckpointESP = v
+	for _, info in pairs(cpTracked) do cpRefresh(info) end
+end)
+Toggle(visScroll, "Highlight", true, function(v)
+	env.CheckpointHighlight = v
+	for _, info in pairs(cpTracked) do cpRefresh(info) end
+end)
+Toggle(visScroll, "Billboard labels", true, function(v)
+	env.CheckpointLabels = v
+	for _, info in pairs(cpTracked) do cpRefresh(info) end
+end)
+Note(visScroll, "Do you take me for a fucking idiot avec?", 44)
 
 ----------------------------------------------------------------
 -- TRAIL TAB : presets + settings
@@ -575,7 +750,7 @@ local function applyTheme(theme)
 	end
 
 	for _, d in ipairs(gui:GetDescendants()) do
-		if not d:IsDescendantOf(espContainer) then
+		if not d:IsDescendantOf(espContainer) and not d:IsDescendantOf(cpContainer) then
 			if d:IsA("GuiObject") then
 				local bg = remap(d.BackgroundColor3)
 				if bg then d.BackgroundColor3 = bg end
@@ -803,6 +978,7 @@ env.UtilityUnload = function()
 	env.VelocityChanger = false
 	env.TrailEnabled = false
 	env.HiddenESP = false
+	env.CheckpointESP = false
 	for _, c in ipairs(conns) do
 		pcall(function() c:Disconnect() end)
 	end
